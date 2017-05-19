@@ -1,69 +1,78 @@
 
 
-function example1(data){
-    d3.select('#chart')
-    .selectAll("div")
-    .data(data)
-    .enter()
-    .append("div")
-    .style("height", (d)=> d.y + "px")
-}
-
-function format(selection){
-    selection
-        .style("background-color", (d)=> {
-            return d.y == 0 ? '#eee' : colorMap(d.y / max)
-        })
-        .style("width", '20px')
-        .style("height", function(d){return d.y / 15 * height + "px"})
-        .style('bottom', '0px')
-}
-
 function example2(data){
-    var max = 10; //d3.max(data, (d) => d.y);
+    var max = d3.max(data, (d) => d.y);
+    var sum = d3.sum(data, (d) => d.y);
     var height = 500;
     var colorMap = d3.interpolateRgb( d3.rgb('#d6e685'), d3.rgb('#1e6823'));
     var chart = d3.select('#chart')
     chart.selectAll('div').attr('class', '');
-    var points = chart.selectAll("div").data(data, (d) => d.x);
-    points.attr('class', 'update');
-    points.transition().duration(1000)
+    var updated = chart.selectAll("div").data(data, (d) => d.x);
+    updated.attr('class', 'update');
+    updated.transition().duration(1000)
         .style("background-color", (d)=> {
-            return d.y == 0 ? '#eee' : colorMap(d.y / max)
+            return d.y == 0 ? '#eee' : colorMap(d.y / sum)
         })
         .style("height", (d) => d.y / 15 * height + "px")
     ;
-    points.enter()
+    updated.exit().transition().duration(500).style("opacity", '0').remove();
+    updated.enter()
         .append("div")
-        .style("background-color", (d)=> {
-            return d.y == 0 ? '#eee' : colorMap(d.y / max)
-        })
         .style("width", '20px')
-        .style("height", function(d){return d.y / 15 * height + "px"})
         .style('bottom', '0px')
+        .style('overflow', 'hidden')
+        .style('color', 'white')
+        .html(d => d.x == ' ' ? '[ ]' : d.x)
+        .style("background-color", (d)=> {
+            return d.y == 0 ? '#eee' : colorMap(d.y / sum)
+        })
+        .style("height", function(d){return d.y / 15 * height + "px"})
     ;
-    // var update = chart.selectAll('div').data(data.slice(-2), (d) => d.x);
-    // update.exit().remove();
+    updated.order();
 }
 
 var alpha = "abcdefghijklmnopqrstuvwxyz".split("");
 
-var data = _.map(alpha, function(ch){return {x: ch, y: Math.random() * 10}});
+var data = {}; //_.map(alpha, function(ch){return {x: ch, y: Math.random() * 10}});
 
 function change() {
-    var mixed = d3.shuffle(data);
-    for(i = 0; i < data.length / 5; i++){
-        data[i].y = Math.random() * 10;
-        if(data[i].y > 9.1 ){
-            data[i].y = 1;
-        }
+    var keys = d3.shuffle(alpha).slice(0, alpha.length/7);
+    for(i = 0; i < keys.length ; i++){
+        data[keys[i]] =  Math.random() * 10;
     }
-    example2(mixed);
+    var arr = _.reduce(data, (m, v, i) => { m.push({x: i, y: v}) ; return m;}, [])
+    example2(arr.sort( (a, b) => a.x.localeCompare(b.x)));
+}
+
+function updateChart(content){
+    var charArr = content.split("");
+    var data = _.reduce(charArr, (memo, value) => {
+        var ch = /\s/.test(value) ? ' ' : value;
+        if(!memo[ch]){
+            memo[ch] = 0;
+        }
+        memo[ch] += 1;
+        return memo;
+    }, {});
+    var arr = _.reduce(data, (m, v, i) => { m.push({x: i, y: v}) ; return m;}, [])
+    example2(arr.sort( (a, b) => a.x.localeCompare(b.x)));
+}
+
+var deferedUpdate = _.debounce(updateChart, 200);
+
+function keyup(e){
+    //console.log(e);
+    var src = e.srcElement;
+    var content = src.value;
+    deferedUpdate(content);
 }
 
 function go(){
-    example2(data);
-    setInterval(change, 999);
+    example2([]);
+    var textArea = document.getElementById('text');
+    textArea.onkeyup = keyup;
+    updateChart(textArea.value);
+    //setInterval(change, 999);
 }
 
 function ready(fn) {
