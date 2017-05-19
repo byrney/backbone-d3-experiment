@@ -1,79 +1,134 @@
 
+let Model = Backbone.Model.extend({
 
-function example2(data){
-    var max = d3.max(data, (d) => d.y);
-    var sum = d3.sum(data, (d) => d.y);
-    var height = 500;
-    var colorMap = d3.interpolateRgb( d3.rgb('#d6e685'), d3.rgb('#1e6823'));
-    var chart = d3.select('#chart')
-    chart.selectAll('div').attr('class', '');
-    var updated = chart.selectAll("div").data(data, (d) => d.x);
-    updated.attr('class', 'update');
-    updated.transition().duration(1000)
-        .style("background-color", (d)=> {
-            return d.y == 0 ? '#eee' : colorMap(d.y / sum)
-        })
-        .style("height", (d) => d.y / 15 * height + "px")
-    ;
-    updated.exit().transition().duration(500).style("opacity", '0').remove();
-    updated.enter()
-        .append("div")
-        .style("width", '20px')
-        .style('bottom', '0px')
-        .style('overflow', 'hidden')
-        .style('color', 'white')
-        .html(d => d.x == ' ' ? '[ ]' : d.x)
-        .style("background-color", (d)=> {
-            return d.y == 0 ? '#eee' : colorMap(d.y / sum)
-        })
-        .style("height", function(d){return d.y / 15 * height + "px"})
-    ;
-    updated.order();
-}
+    defaults: {
+        characters: {}
+    },
 
-var alpha = "abcdefghijklmnopqrstuvwxyz".split("");
+    initialize: function(data, options){
+    },
 
-var data = {}; //_.map(alpha, function(ch){return {x: ch, y: Math.random() * 10}});
+    contentUpdated: function(content){
+        var chars = this.countChars(content);
+        this.set({
+            characters: chars
+        });
+    },
 
-function change() {
-    var keys = d3.shuffle(alpha).slice(0, alpha.length/7);
-    for(i = 0; i < keys.length ; i++){
-        data[keys[i]] =  Math.random() * 10;
+    // converts string of chars into frequency
+    countChars: function(content){
+        var charArr = content.split("");
+        var data = _.reduce(charArr, (memo, value) => {
+            // put all whitespace chars in the same category
+            var ch = /\s/.test(value) ? ' ' : value;
+            memo[ch] = memo[ch] ? memo[ch] + 1 : 1;
+            return memo;
+        }, {});
+        var arr = _.reduce(data, (m, v, i) => {
+            m.push({ x: i, y: v });
+            return m;
+        }, [])
+        return arr;
+    },
+
+});
+
+
+let ChartView = Backbone.View.extend({
+
+    barColor: d3.interpolateRgb( d3.rgb('#d6e685'), d3.rgb('red')),
+    pixelsPerCount: 500 / 15,
+
+    initialize: function(options){
+        console.log('chart.initialize', this.el);
+        this.lazyUpdate = _.debounce(this.modelUpdated, 200);
+        this.listenTo(this.model, 'change', this.lazyUpdate);
+    },
+
+    modelUpdated: function(){
+        var counts = this.model.get('characters');
+        this.frequencyChart(counts.sort( (a, b) => a.x.localeCompare(b.x)));
+    },
+
+    // called when the data in the model changes
+    frequencyChart: function(counts){
+        var totalCount = d3.sum(counts, (d) => d.y);
+        var chart = d3.select(this.el);
+        chart.selectAll('div').attr('class', '');
+        var updated = chart.selectAll("div").data(counts, (d) => d.x);
+        this.dataUpdated(updated, totalCount)
+        // bars which are being added
+        this.dataAdded(updated.enter(), totalCount);
+        // bars which are leaving the chart fade then remove the div
+        this.dataRemoved(updated.exit());
+        updated.order();
+    },
+
+    dataAdded: function(added, totalCount){
+        added.append("div")
+            .style("width", '20px')
+            .style('bottom', '0px')
+            .style('overflow', 'hidden')
+            .style('color', 'white')
+            .html(d => d.x == ' ' ? '[ ]' : d.x)
+            .style("background-color", (d)=> {
+                return d.y == 0 ? '#eee' : this.barColor(d.y / totalCount)
+            })
+            .style("height", d =>  d.y * this.pixelsPerCount + "px")
+        ;
+    },
+
+    // called with the updated bars when data is changed
+    dataUpdated: function(updated, totalCount){
+        // when the totalCount changes the color of all the bars is affected
+        updated.transition()
+            .duration(200)
+            .style("background-color", (d)=> {
+                return d.y == 0 ? '#eee' : this.barColor(d.y / totalCount)
+            })
+            .style("height", d =>  d.y * this.pixelsPerCount + "px")
+        ;
+    },
+
+    dataRemoved: function(exit){
+        exit
+            .transition().duration(1000).style("opacity", '0')
+            .remove()
+        ;
+    },
+
+});
+
+
+let EditView = Backbone.View.extend({
+
+    initialize: function(options){
+        console.log('editview.initialize', this.el);
+        this.model.contentUpdated(this.el.value);
+    },
+
+    events: {
+        'keyup': 'textKeyUp'
+    },
+
+    textKeyUp: function(e){
+        this.model.contentUpdated(this.el.value);
     }
-    var arr = _.reduce(data, (m, v, i) => { m.push({x: i, y: v}) ; return m;}, [])
-    example2(arr.sort( (a, b) => a.x.localeCompare(b.x)));
+
+});
+
+function main(){
+    var model = new Model();
+    var chart = new ChartView({
+        model: model,
+        el: '#chart'
+    });
+    var edit = new EditView({
+        model: model,
+        el: '#text'
+    });
 }
 
-function updateChart(content){
-    var charArr = content.split("");
-    var data = _.reduce(charArr, (memo, value) => {
-        var ch = /\s/.test(value) ? ' ' : value;
-        if(!memo[ch]){
-            memo[ch] = 0;
-        }
-        memo[ch] += 1;
-        return memo;
-    }, {});
-    var arr = _.reduce(data, (m, v, i) => { m.push({x: i, y: v}) ; return m;}, [])
-    example2(arr.sort( (a, b) => a.x.localeCompare(b.x)));
-}
-
-var deferedUpdate = _.debounce(updateChart, 200);
-
-function keyup(e){
-    //console.log(e);
-    var src = e.srcElement;
-    var content = src.value;
-    deferedUpdate(content);
-}
-
-function go(){
-    example2([]);
-    var textArea = document.getElementById('text');
-    textArea.onkeyup = keyup;
-    updateChart(textArea.value);
-    //setInterval(change, 999);
-}
 
 function ready(fn) {
     if (document.readyState != 'loading'){
@@ -83,4 +138,4 @@ function ready(fn) {
     }
 }
 
-ready(go);
+ready(main);
