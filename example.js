@@ -83,7 +83,6 @@ let ChartView = Backbone.View.extend({
 
     // called with the updated bars when data is changed
     dataUpdated: function(updated, totalCount){
-        // when the totalCount changes the color of all the bars is affected
         updated.transition()
             .duration(200)
             .style("background-color", (d)=> {
