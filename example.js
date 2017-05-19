@@ -45,17 +45,19 @@ let ChartView = Backbone.View.extend({
         this.listenTo(this.model, 'change', this.lazyUpdate);
     },
 
+    // called by backbone when the data in the model changes
     modelUpdated: function(){
         var counts = this.model.get('characters');
         this.frequencyChart(counts.sort( (a, b) => a.x.localeCompare(b.x)));
     },
 
-    // called when the data in the model changes
     frequencyChart: function(counts){
         var totalCount = d3.sum(counts, (d) => d.y);
         var chart = d3.select(this.el);
         chart.selectAll('div').attr('class', '');
         var updated = chart.selectAll("div").data(counts, (d) => d.x);
+        // all bars need updating when the totals change because the colors
+        // are relative
         this.dataUpdated(updated, totalCount)
         // bars which are being added
         this.dataAdded(updated.enter(), totalCount);
@@ -64,6 +66,7 @@ let ChartView = Backbone.View.extend({
         updated.order();
     },
 
+    // called when data is added to d3
     dataAdded: function(added, totalCount){
         added.append("div")
             .style("width", '20px')
@@ -90,6 +93,7 @@ let ChartView = Backbone.View.extend({
         ;
     },
 
+    // called when data is removed from d3
     dataRemoved: function(exit){
         exit
             .transition().duration(1000).style("opacity", '0')
@@ -104,6 +108,7 @@ let EditView = Backbone.View.extend({
 
     initialize: function(options){
         console.log('editview.initialize', this.el);
+        // trigger an update with the initial text in the control
         this.model.contentUpdated(this.el.value);
     },
 
@@ -111,6 +116,7 @@ let EditView = Backbone.View.extend({
         'keyup': 'textKeyUp'
     },
 
+    // called when text is entered into the control
     textKeyUp: function(e){
         this.model.contentUpdated(this.el.value);
     }
