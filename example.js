@@ -35,7 +35,6 @@ let Model = Backbone.Model.extend({
 
 
 let ChartView = Backbone.View.extend({
-
     barColor: d3.interpolateRgb( d3.rgb('#d6e685'), d3.rgb('red')),
     pixelsPerCount: 500 / 15,
 
@@ -53,39 +52,52 @@ let ChartView = Backbone.View.extend({
 
     frequencyChart: function(counts){
         var totalCount = d3.sum(counts, (d) => d.y);
-        var chart = d3.select(this.el);
-        chart.selectAll('div').attr('class', '');
-        var updated = chart.selectAll("div").data(counts, (d) => d.x);
+        var chart = d3.select(this.el).append('svg');
+        chart.selectAll('rect').attr('class', '');
+        var updated = chart.selectAll("rect").data(counts, (d) => d.x);
         // all bars need updating when the totals change because the colors
         // are relative
         this.dataUpdated(updated, totalCount)
         // bars which are being added
         this.dataAdded(updated.enter(), totalCount);
-        // bars which are leaving the chart fade then remove the div
+        // bars which are leaving the chart fade then remove the rect
         this.dataRemoved(updated.exit());
         updated.order();
     },
+    
 
     // called when data is added to d3
     dataAdded: function(added, totalCount){
-        added.append("div")
-            .style("width", '20px')
-            .style('bottom', '0px')
-            .style('overflow', 'hidden')
-            .style('color', 'white')
-            .html(d => d.x == ' ' ? '[ ]' : d.x)
-            .style("background-color", (d)=> {
+        var data = this.model.attributes.characters;
+        var height = 280, width = 600;
+        var xAxis = d3.scaleBand()
+                .domain(data.map(d => {return d.x}))
+                .range([0, width]); 
+        var yAxis = d3.scaleLinear()
+                .domain([0, d3.max(data, d=> {return d.y})])
+                .range([height, 0]);
+        added.append('rect')
+            .attr('x',  d => {return xAxis(d.x)})
+            .attr('width', ( width / (data.map(function(d){return d.x})).length))
+            .attr('height', '0')
+            .attr("fill", (d)=> {
                 return d.y == 0 ? '#eee' : this.barColor(d.y / totalCount)
             })
-            .style("height", d =>  d.y * this.pixelsPerCount + "px")
+            .attr('y', d =>{ return yAxis(d.y) })
+            .attr('height', d => { return (height - yAxis(d.y))})
         ;
-    },
+        added.append('text')
+            .attr("x", d=> { return xAxis(d.x); })
+            .attr("y",  d =>{ return yAxis(d.y) })
+            .attr("dy", ".35em")
+            .text(d => d.x == ' ' ? '[ ]' : d.x);
+        },
 
     // called with the updated bars when data is changed
     dataUpdated: function(updated, totalCount){
         updated.transition()
             .duration(200)
-            .style("background-color", (d)=> {
+            .attr("fill", (d)=> {
                 return d.y == 0 ? '#eee' : this.barColor(d.y / totalCount)
             })
             .style("height", d =>  d.y * this.pixelsPerCount + "px")
