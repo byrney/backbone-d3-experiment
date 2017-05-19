@@ -51,56 +51,64 @@ let ChartView = Backbone.View.extend({
     },
 
     frequencyChart: function(counts){
-        var totalCount = d3.sum(counts, (d) => d.y);
-        var chart = d3.select(this.el).append('svg');
-        chart.selectAll('rect').attr('class', '');
-        var updated = chart.selectAll("rect").data(counts, (d) => d.x);
-        // all bars need updating when the totals change because the colors
-        // are relative
-        this.dataUpdated(updated, totalCount)
-        // bars which are being added
-        this.dataAdded(updated.enter(), totalCount);
-        // bars which are leaving the chart fade then remove the rect
-        this.dataRemoved(updated.exit());
-        updated.order();
-    },
-    
-
-    // called when data is added to d3
-    dataAdded: function(added, totalCount){
         var data = this.model.attributes.characters;
-        var height = 280, width = 600;
+        var margins = {top: 0, bottom: 30, left: 30, right: 0};
+        var height = (280 - margins.top - margins.bottom), width = (600 - margins.left - margins.right);
         var xAxis = d3.scaleBand()
                 .domain(data.map(d => {return d.x}))
                 .range([0, width]); 
         var yAxis = d3.scaleLinear()
                 .domain([0, d3.max(data, d=> {return d.y})])
                 .range([height, 0]);
+    
+        var totalCount = d3.sum(counts, (d) => d.y);
+        var chart = d3.select(this.el );
+        chart.selectAll('rect').attr('class', '');
+
+        var updated = chart.selectAll("rect").data(counts, (d) => d.x);
+        var updatedText = chart.selectAll("text");
+        // all bars need updating when the totals change because the colors
+        // are relative
+        this.dataUpdated(updated, totalCount, height, width, xAxis, yAxis)
+        // bars which are being added
+        this.dataAdded(updated.enter(), totalCount,data,  height, width, xAxis, yAxis);
+        // bars which are leaving the chart fade then remove the rect
+        this.dataRemoved(updated.exit(), updatedText.exit());
+        updated.order();
+    },
+    
+
+    // called when data is added to d3
+    dataAdded: function(added, totalCount, data, height, width, xAxis, yAxis){
         added.append('rect')
             .attr('x',  d => {return xAxis(d.x)})
+            .attr('y', d =>{ return yAxis(d.y) })
             .attr('width', ( width / (data.map(function(d){return d.x})).length))
-            .attr('height', '0')
+            .attr('height', d => { return (height - yAxis(d.y))})
             .attr("fill", (d)=> {
                 return d.y == 0 ? '#eee' : this.barColor(d.y / totalCount)
             })
-            .attr('y', d =>{ return yAxis(d.y) })
-            .attr('height', d => { return (height - yAxis(d.y))})
         ;
         added.append('text')
             .attr("x", d=> { return xAxis(d.x); })
             .attr("y",  d =>{ return yAxis(d.y) })
             .attr("dy", ".35em")
-            .text(d => d.x == ' ' ? '[ ]' : d.x);
+            .text(d => d.x == ' ' ? '[ ]' : d.x)
+        ;
         },
 
     // called with the updated bars when data is changed
-    dataUpdated: function(updated, totalCount){
+    dataUpdated: function(updated, totalCount, height, width, xAxis, yAxis){
+        var data = this.model.attributes.characters;
         updated.transition()
             .duration(200)
             .attr("fill", (d)=> {
                 return d.y == 0 ? '#eee' : this.barColor(d.y / totalCount)
             })
-            .style("height", d =>  d.y * this.pixelsPerCount + "px")
+            .attr('x',  d => {return xAxis(d.x)})
+            .attr('y', d =>{ return yAxis(d.y) })
+            .attr('height', d => { return (height - yAxis(d.y))})
+            .attr('width', ( width / (data.map(function(d){return d.x})).length))
         ;
     },
 
@@ -138,7 +146,7 @@ function main(){
     var model = new Model();
     var chart = new ChartView({
         model: model,
-        el: '#chart'
+        el: '#chart svg'
     });
     var edit = new EditView({
         model: model,
