@@ -52,7 +52,7 @@ let ChartView = Backbone.View.extend({
 
     frequencyChart: function(counts){
         var data = this.model.attributes.characters;
-        var margins = {top: 0, bottom: 30, left: 30, right: 0};
+        var margins = {top: 30, bottom: 30, left: 30, right: 0};
         var height = (280 - margins.top - margins.bottom), width = (600 - margins.left - margins.right);
         var xAxis = d3.scaleBand()
                 .domain(data.map(d => {return d.x}))
@@ -65,40 +65,60 @@ let ChartView = Backbone.View.extend({
         var chart = d3.select(this.el );
         chart.selectAll('rect').attr('class', '');
 
-        var updated = chart.selectAll("rect").data(counts, (d) => d.x);
-        var updatedText = chart.selectAll("text");
+        var updated = chart.selectAll('rect').data(counts, (d) => d.x);
+        var updatedText = chart.selectAll('text').data(counts, (d) => d.x);
         // all bars need updating when the totals change because the colors
         // are relative
-        this.dataUpdated(updated, totalCount, height, width, xAxis, yAxis)
+        this.dataUpdated(updated, totalCount, height, width, xAxis, yAxis, updatedText)
         // bars which are being added
-        this.dataAdded(updated.enter(), totalCount,data,  height, width, xAxis, yAxis);
+        this.dataAdded(updated.enter(), totalCount, data, height, width, xAxis, yAxis, updatedText.enter(), chart);
         // bars which are leaving the chart fade then remove the rect
-        this.dataRemoved(updated.exit(), updatedText.exit());
+        this.dataRemoved(updated.exit());
+        this.dataRemoved(updatedText.exit());
         updated.order();
+        updatedText.order();
     },
     
 
     // called when data is added to d3
-    dataAdded: function(added, totalCount, data, height, width, xAxis, yAxis){
+    dataAdded: function(added, totalCount, data, height, width, xAxis, yAxis, updatedText, chart){
         added.append('rect')
             .attr('x',  d => {return xAxis(d.x)})
             .attr('y', d =>{ return yAxis(d.y) })
             .attr('width', ( width / (data.map(function(d){return d.x})).length))
             .attr('height', d => { return (height - yAxis(d.y))})
-            .attr("fill", (d)=> {
+            .attr('fill', (d)=> {
                 return d.y == 0 ? '#eee' : this.barColor(d.y / totalCount)
             })
         ;
-        added.append('text')
-            .attr("x", d=> { return xAxis(d.x); })
-            .attr("y",  d =>{ return yAxis(d.y) })
-            .attr("dy", ".35em")
+        updatedText.append('text')
+            .attr('x', d=> {return xAxis(d.x) + width / (data.map(function(d){return d.x})).length / 2 }) 
+            .attr('y',  d =>{ return yAxis(d.y) })
+            .attr('dy', '.50em')
+            .attr('dx', '-0.15em' )
             .text(d => d.x == ' ' ? '[ ]' : d.x)
         ;
+        //Add x-axis
+        // chart.append("g")
+        //     .attr("class", "axis axis--x")
+        //     .attr("transform", "translate(0," + height + ")")
+        //     .call(d3.axisBottom(xAxis))
+        //     ;
+        // //Add y-Axis
+        // chart.append("g")
+        //     .attr("class", "axis axis--y")
+        //     .call(d3.axisLeft(yAxis))
+        //     .append("text")
+        //     .attr("transform", "rotate(-90)")
+        //     .attr("y", 0)
+        //     .attr("dy", "0.71em")
+        //     .attr("text-anchor", "end")
+        //     .text("Frequency")
+        //     ;
         },
 
     // called with the updated bars when data is changed
-    dataUpdated: function(updated, totalCount, height, width, xAxis, yAxis){
+    dataUpdated: function(updated, totalCount, height, width, xAxis, yAxis, updatedText){
         var data = this.model.attributes.characters;
         updated.transition()
             .duration(200)
@@ -106,16 +126,23 @@ let ChartView = Backbone.View.extend({
                 return d.y == 0 ? '#eee' : this.barColor(d.y / totalCount)
             })
             .attr('x',  d => {return xAxis(d.x)})
-            .attr('y', d =>{ return yAxis(d.y) })
+            .attr('y', d =>{ return yAxis(d.y)})
             .attr('height', d => { return (height - yAxis(d.y))})
             .attr('width', ( width / (data.map(function(d){return d.x})).length))
         ;
+        updatedText
+            .transition()
+            .duration(200)
+            .attr('x', d=> {return xAxis(d.x) + width / (data.map(function(d){return d.x})).length / 2 }) 
+            .attr('y',  d =>{ return yAxis(d.y) })
+            .attr('dy', '.50em')
+            .attr('dx', '-0.15em')
     },
 
     // called when data is removed from d3
     dataRemoved: function(exit){
         exit
-            .transition().duration(1000).style("opacity", '0')
+            .transition().duration(1000).attr("opacity", '0')
             .remove()
         ;
     },
