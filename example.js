@@ -54,34 +54,46 @@ let ChartView = Backbone.View.extend({
         var data = this.model.attributes.characters;
         var margins = {top: 30, bottom: 30, left: 30, right: 0};
         var height = (280 - margins.top - margins.bottom), width = (600 - margins.left - margins.right);
-        var xAxis = d3.scaleBand()
-                .domain(data.map(d => {return d.x}))
+        //Axis to turn space into [ ] only for the drawn axis 
+        var xAxis  = d3.scaleBand()
+                .domain(data.map(d => d.x))
                 .range([0, width]); 
         var yAxis = d3.scaleLinear()
-                .domain([0, d3.max(data, d=> {return d.y})])
+                .domain([0, d3.max(data, d => d.y)])
                 .range([height, 0]);
-    
         var totalCount = d3.sum(counts, (d) => d.y);
-        var chart = d3.select(this.el );
+        var chart = d3.select(this.el ).attr("transform", "translate(" + margins.left + "," + margins.top + ")");
         chart.selectAll('rect').attr('class', '');
-
         var updated = chart.selectAll('rect').data(counts, (d) => d.x);
         var updatedText = chart.selectAll('text').data(counts, (d) => d.x);
+        //Add x-axis
+        chart.append("g")
+            .attr("class", "axis axis--x")
+            .attr("transform", "translate(0," + height + ")")
+            .call(d3.axisBottom(xAxis));
+            
+        //Add y-Axis
+        chart.append("g")
+            .attr("class", "axis axis--y")
+            .call(d3.axisLeft(yAxis))
+            ;
+        //Removing ticks for now, as not updating correctly 
+        chart.selectAll('.tick line')
+            .remove()
         // all bars need updating when the totals change because the colors
         // are relative
         this.dataUpdated(updated, totalCount, height, width, xAxis, yAxis, updatedText)
         // bars which are being added
-        this.dataAdded(updated.enter(), totalCount, data, height, width, xAxis, yAxis, updatedText.enter(), chart);
+        this.dataAdded(updated.enter(), totalCount, data, height, width, xAxis, yAxis, updatedText.enter());
         // bars which are leaving the chart fade then remove the rect
         this.dataRemoved(updated.exit());
         this.dataRemoved(updatedText.exit());
         updated.order();
         updatedText.order();
     },
-    
 
     // called when data is added to d3
-    dataAdded: function(added, totalCount, data, height, width, xAxis, yAxis, updatedText, chart){
+    dataAdded: function(added, totalCount, data, height, width, xAxis, yAxis, updatedText){
         added.append('rect')
             .attr('x',  d => {return xAxis(d.x)})
             .attr('y', d =>{ return yAxis(d.y) })
@@ -95,26 +107,9 @@ let ChartView = Backbone.View.extend({
             .attr('x', d=> {return xAxis(d.x) + width / (data.map(function(d){return d.x})).length / 2 }) 
             .attr('y',  d =>{ return yAxis(d.y) })
             .attr('dy', '.50em')
-            .attr('dx', '-0.15em' )
+            .attr('dx', '-0.25em' )
             .text(d => d.x == ' ' ? '[ ]' : d.x)
         ;
-        //Add x-axis
-        // chart.append("g")
-        //     .attr("class", "axis axis--x")
-        //     .attr("transform", "translate(0," + height + ")")
-        //     .call(d3.axisBottom(xAxis))
-        //     ;
-        // //Add y-Axis
-        // chart.append("g")
-        //     .attr("class", "axis axis--y")
-        //     .call(d3.axisLeft(yAxis))
-        //     .append("text")
-        //     .attr("transform", "rotate(-90)")
-        //     .attr("y", 0)
-        //     .attr("dy", "0.71em")
-        //     .attr("text-anchor", "end")
-        //     .text("Frequency")
-        //     ;
         },
 
     // called with the updated bars when data is changed
@@ -136,7 +131,8 @@ let ChartView = Backbone.View.extend({
             .attr('x', d=> {return xAxis(d.x) + width / (data.map(function(d){return d.x})).length / 2 }) 
             .attr('y',  d =>{ return yAxis(d.y) })
             .attr('dy', '.50em')
-            .attr('dx', '-0.15em')
+            .attr('dx', '-0.25em')
+            ;
     },
 
     // called when data is removed from d3
