@@ -70,8 +70,8 @@ let ChartView = Backbone.View.extend({
         chart.append("g")
             .attr("class", "axis axis--x")
             .attr("transform", "translate(0," + height + ")")
-            .call(d3.axisBottom(xAxis));
-            
+            .call(d3.axisBottom(xAxis))
+            ;
         //Add y-Axis
         chart.append("g")
             .attr("class", "axis axis--y")
